@@ -10,7 +10,7 @@ from nilearn.image.resampling import coord_transform
 from nilearn.glm.first_level import make_first_level_design_matrix, compute_regressor, spm_hrf, FirstLevelModel
 from nilearn.plotting import plot_design_matrix
 
-from MA.Tutorial.functions.config import CONFIG
+from .config import CONFIG
 
 class Duncan_Prep:
     def __init__(self, sub_range=[1,2,3,4,5,6], VT_atlas='HA'):
@@ -25,7 +25,7 @@ class Duncan_Prep:
         main_path = CONFIG["Prep"]["main_path"]
         for sub in self.sub_range:
 
-            folder_path = os.path.join(main_path, f'sub-{str(sub).zfill(2)}', 'func\\sliced')
+            folder_path = os.path.join(main_path, f'sub-{str(sub).zfill(2)}', 'func/sliced')
 
             slice_files = sorted(
                 [os.path.join(folder_path, f) for f in os.listdir(folder_path) if
@@ -101,8 +101,8 @@ class Duncan_Prep:
         ho_maps = ho_atlas.maps
 
         # read labels
-        for idx, label in enumerate(ho_atlas.labels):
-            print(f"{idx}: {label}")
+        #for idx, label in enumerate(ho_atlas.labels):
+        #   print(f"{idx}: {label}")
 
         ### Backup
         # # define VT_area
@@ -178,7 +178,7 @@ class Duncan_Prep:
         duncan_vt_mask[i_min:i_max + 1, j_min:j_max + 1, k_min:k_max + 1] = 1
 
         # transform numpy array to nifti
-        duncan_vt_mask_img = nib.Nifti1Image(duncan_vt_mask, MNI_template.affine)
+        duncan_vt_mask_img = nib.Nifti1Image(duncan_vt_mask.astype(np.int16), MNI_template.affine)
         duncan_vt_mask_resampled = image.resample_to_img(duncan_vt_mask_img, self.data_prep_Nifti[0],
                                                          interpolation='nearest')
 

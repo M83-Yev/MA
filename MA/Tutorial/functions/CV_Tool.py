@@ -7,9 +7,9 @@ from sklearn.metrics import balanced_accuracy_score, confusion_matrix
 from sklearn.model_selection import KFold
 from sklearn.multiclass import OneVsRestClassifier
 
-from MA.Tutorial.functions.Hypertool import HyperAlign, procrustes
-from MA.Tutorial.functions.MCCAtool import MCCA
-from MA.Tutorial.functions.config import CONFIG
+from .MCCAtool import MCCA, PCA_60
+from .config import CONFIG
+from .Hypertool import HyperAlign, procrustes
 
 
 class CV_Tool:
@@ -19,7 +19,7 @@ class CV_Tool:
                  permute=False, seed=0,
                  random_train=False,
                  random_voxel=False,
-                 nested = False):
+                 nested=False):
 
         self.random_voxel = random_voxel
         self.random_train = random_train
@@ -105,28 +105,33 @@ class CV_Tool:
 
             # logistic regression model
             clf = OneVsRestClassifier(LogisticRegression(solver='liblinear', penalty='l2', random_state=0))
-            if not self.nested_cv:
-                clf.fit(X_train, y_train)
-                y_pred = clf.predict(X_test)
-                score = balanced_accuracy_score(y_test, y_pred)
-            else:
-                kfold = KFold(4, shuffle=True)
-                score_nest = []
-                for train_idx, test_idx in kfold.split(X_test):
-                    X_test_train, X_test_test = X_test[train_idx, :], X_test[test_idx, :]
-                    y_test_train, y_test_test = y_test[train_idx], y_test[test_idx]
+            clf.fit(X_train, y_train)
+            y_pred = clf.predict(X_test)
+            score = balanced_accuracy_score(y_test, y_pred)
 
-                    clf.fit(X_test_train, y_test_train)
-                    y_test_pred = clf.predict(X_test_test)
-                    score_tem = balanced_accuracy_score(y_test_test, y_test_pred)
-                    score_nest.append(score_tem)
-                score = sum(score_nest) / len(score_nest)
+            # if not self.nested_cv:
+            #    clf.fit(X_train, y_train)
+            #    y_pred = clf.predict(X_test)
+            #    score = balanced_accuracy_score(y_test, y_pred)
+            # else:
+            #    kfold = KFold(4, shuffle=True)
+            #    score_nest = []
+            #    for train_idx, test_idx in kfold.split(X_test):
+            #        X_test_train, X_test_test = X_test[train_idx, :], X_test[test_idx, :]
+            #        y_test_train, y_test_test = y_test[train_idx], y_test[test_idx]#
+
+            #       clf.fit(X_test_train, y_test_train)
+            #        y_test_pred = clf.predict(X_test_test)
+            #        score_tem = balanced_accuracy_score(y_test_test, y_test_pred)
+            #        score_nest.append(score_tem)
+            #    score = sum(score_nest) / len(score_nest)
 
             # y_true_all.append(y_test)
             # y_pred_all.append(y_pred)
 
             print(i, score)
             self.BAs.append(score)
+        return self.BAs
 
     def _nested_cv(self, X_train, X_test, y_train, y_test, n_splits=5):
         kfold = KFold(n_splits, shuffle=True)
@@ -164,6 +169,8 @@ class CV_Tool:
                 r=CONFIG["MCCA"]["r"]
             )
 
+            X_train = [PCA_60(X, X.shape[0]) for X in X_train]
+            X_train = np.array(X_train)
             mcca.fit(X_train)
             X_train = mcca.transform(X_train)
             mcca.mcca_space()
@@ -172,10 +179,26 @@ class CV_Tool:
                 X_test = np.random.rand(size_test[0], size_test[1] * 1000)
             else:
                 X_test = X_array[leave_out_sub]
-            mcca.fit_new_data(X_test)
-            X_test = mcca.transform_new_data(X_test)
+            if self.nested_cv:
+                kfold = KFold(4, shuffle=False)
+                X_test_all, y_test_all = [], []
+                for train_idx, test_idx in kfold.split(X_test):
+                    X_test_train, X_test_test = X_test[train_idx, :], X_test[test_idx, :]
+                    y_test_train, y_test_test = y_test[train_idx], y_test[test_idx]
+                    n_cc = CONFIG["MCCA"]["n_components_mcca"]
+                    X_test_train = PCA_60(X_test_train, n_cc)
+                    X_test_test = PCA_60(X_test_test, n_cc)
+                    mcca.fit_new_data(X_test_train, train_idx=train_idx)
+                    X_test_test = mcca.transform_new_data(X_test_test)
+                    X_test_all.append(X_test_test)
+                    y_test_all.append(y_test_test)
+                return X_train, np.concatenate(X_test_all), y_train, np.concatenate(y_test_all)
 
-        return X_train, X_test, y_train, y_test
+            else:
+                mcca.fit_new_data(X_test)
+                X_test = mcca.transform_new_data(X_test)
+
+                return X_train, X_test, y_train, y_test
 
     def _random_permutation(self, y, seed):
         """ Randomly permute labels for each subject using the provided seed. """
