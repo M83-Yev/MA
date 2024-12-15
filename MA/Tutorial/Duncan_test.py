@@ -1,20 +1,95 @@
+import os
 import numpy as np
-
-from MA.Tutorial.functions.CV_Tool import CV_Tool
-from MA.Tutorial.functions.Duncan_prep import Duncan_Prep
-from MA.Tutorial.functions.MCCAtool import whiten, center, PCA_60
-from MA.Tutorial.functions.config import CONFIG
+from functions.CV_Tool import CV_Tool
+from functions.Duncan_prep import Duncan_Prep
+from functions.MCCAtool import whiten, center, PCA_60
+from functions.config import CONFIG
 
 prep = Duncan_Prep(sub_range=np.array([1, 2, 3, 4, 5, 6]), VT_atlas='HA')
 design_matrix, _ = prep.design_matrix(plot=False)
-data = prep.masker(vt_idx = [23,34,35]) # 7
+# data = prep.masker(vt_idx = [15, 16, 23, 34, 35, 38, 39, 40]) # 7
 # prep.masker(vt_idx=[15, 16, 23, 34, 35, 38, 39, 40])  # 7
-X, Y = prep.prepare_data()
-CONFIG["PCA"]["n_pcs"] = int(120)
-CONFIG["MCCA"]["n_components_mcca"] = int(100)
-CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False, nested=True)
-CV.inter_sub(X, Y)
+# X, Y = prep.prepare_data()
+# CONFIG["PCA"]["n_pcs"] = int(120)
+# CONFIG["MCCA"]["n_components_mcca"] = int(100)
+# CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False, nested=True)
+# CV.inter_sub(X, Y)
 
+print('Check HO atlas and cc pc numbers')
+vt_idx = 5
+prep.masker(vt_idx=[vt_idx])
+X, Y = prep.prepare_data()
+BAs = []
+#for n_pc in np.linspace(10, 100, 10):
+#    CONFIG["PCA"]["n_pcs"] = int(n_pc)
+#    X_whiten = [PCA_60(sub) for sub in X]
+#    for n_cc in np.linspace(10, 100, 10):
+#        if n_cc > n_pc:
+#            continue
+#        else:
+#            CONFIG["MCCA"]["n_components_mcca"] = int(n_cc)
+#            CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False,
+#                         nested=True)
+#            print(f'vt_idx: {vt_idx}, with n_pc: {n_pc}, n_cc: {n_cc}')
+#            ba = CV.inter_sub(X_whiten, Y)
+#    BAs.append(np.mean(ba))
+for n_cc in np.linspace(10, 100, 10):
+    CONFIG["MCCA"]["n_components_mcca"] = int(n_cc)
+    CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False,
+                 nested=True)
+    print(f'vt_idx: {vt_idx}, with n_cc: {n_cc}')
+    ba = CV.inter_sub(X, Y)
+    BAs.append(np.mean(ba))
+
+# Test on Duncan defined area
+print('Now deal with data for Duncan defined brain area')
+main_path = CONFIG["Prep"]["main_path"]
+CONFIG["PCA"]["n_pcs"] = int(100)
+X_array = np.load(os.path.join(main_path, 'X_array.npy'), allow_pickle=True)
+Y_array = np.load(os.path.join(main_path, 'Y_array.npy'), allow_pickle=True)
+# X_array = [PCA_60(X) for X in X_array]
+CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False, nested=True)
+CV.inter_sub(X_array, Y_array)
+
+#0 0.3182539682539683
+#1 0.2678217615717616
+#2 0.18901289682539685
+#3 0.1925843253968254
+#4 0.18633432539682543
+#5 0.17547123015873017
+
+print('Check HO atlas and cc pc numbers')
+for vt_idx in np.arange(49):
+    prep.masker(vt_idx=[vt_idx])
+    X, Y = prep.prepare_data()
+
+    for n_pc in np.linspace(10, 100, 10):
+        CONFIG["PCA"]["n_pcs"] = int(n_pc)
+        X_whiten = [PCA_60(sub) for sub in X]
+        for n_cc in np.linspace(10, 100, 10):
+            if n_cc > n_pc:
+                continue
+            else:
+                CONFIG["MCCA"]["n_components_mcca"] = int(n_cc)
+                CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False,
+                             nested=True)
+                print(f'vt_idx: {vt_idx}, with n_pc: {n_pc}, n_cc: {n_cc}')
+                CV.inter_sub(X_whiten, Y)
+
+print('Check HO atlas and cc pc numbers')
+BAs = []
+for vt_idx in np.arange(49):
+    CONFIG["PCA"]["n_pcs"] = 100
+    CONFIG["MCCA"]["n_components_mcca"] = 100
+    prep.masker(vt_idx=[vt_idx])
+    X, Y = prep.prepare_data()
+    X = [PCA_60(sub) for sub in X]
+
+    CV = CV_Tool(method='MCCA', permute=False, seed=20241201, random_train=False, random_voxel=False, nested=True)
+    print(f'vt_idx: {vt_idx}')
+    ba = CV.inter_sub(X, Y)
+    BAs.append(np.mean(ba))
+a=1
 
 # 15 nested CV
 # 0 0.328125
@@ -31,6 +106,22 @@ CV.inter_sub(X, Y)
 # 3 0.36307043650793647
 # 4 0.34293154761904765
 # 5 0.3433351370851371
+
+# another run:
+# 0 0.40295138888888893
+# 1 0.42559142246642245
+# 2 0.349934613997114
+# 3 0.3882124819624819
+# 4 0.3230654761904762
+# 5 0.35022546897546897
+
+# [15, 16, 23, 34, 35, 38, 39, 40] ~10h
+# 0 0.3361967893217893
+# 1 0.4036796536796537
+# 2 0.3116026334776335
+# 3 0.3638325216450216
+# 4 0.5243461399711399
+# 5 0.3214195526695527
 
 # for vt_idx in np.arange(49):
 #     prep.masker(vt_idx=vt_idx)
@@ -145,3 +236,4 @@ CV.inter_sub(X, Y)
 # 3 0.23333333333333334
 # 4 0.2
 # 5 0.20833333333333331
+
