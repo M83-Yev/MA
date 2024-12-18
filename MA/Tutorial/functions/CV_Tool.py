@@ -4,10 +4,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedShuffleSplit
 from sklearn.multiclass import OneVsRestClassifier
 
-from .MCCAtool import MCCA, PCA_60
+from .MCCAtool import MCCA, PCA_60, PCA_MA
 from .config import CONFIG
 from .Hypertool import HyperAlign, procrustes
 
@@ -130,7 +130,9 @@ class CV_Tool:
             # y_pred_all.append(y_pred)
 
             print(i, score)
+
             self.BAs.append(score)
+        print(f'mean {np.mean(self.BAs):.4f}, std: {np.std(self.BAs):.4f}')
         return self.BAs
 
     def _nested_cv(self, X_train, X_test, y_train, y_test, n_splits=5):
@@ -147,6 +149,7 @@ class CV_Tool:
             X_array = [x[:, np.random.permutation(x.shape[1])] for x in X_array]
 
         X_array, Y_array = np.array(X_array), np.array(Y_array)
+        #X_array = np.array([x-np.mean(x,axis=0) for x in X_array])
         train_idx = np.setdiff1d(np.arange(len(X_array)), leave_out_sub)
         X_train = X_array[train_idx]
         y_train = Y_array[train_idx]
@@ -168,26 +171,49 @@ class CV_Tool:
                 n_components_mcca=CONFIG["MCCA"]["n_components_mcca"],
                 r=CONFIG["MCCA"]["r"]
             )
+            n_cc = CONFIG["MCCA"]["n_components_mcca"]
+            pca = PCA_MA(_whiten=True, n_components=n_cc)
+            # X_train = [PCA_60(X, X.shape[0]) for X in X_train]
+            X_train = [PCA_60(X, n_cc) for X in X_train]
 
-            X_train = [PCA_60(X, X.shape[0]) for X in X_train]
+            #X_train = [pca.fit_transform(x) for x in X_train]
             X_train = np.array(X_train)
             mcca.fit(X_train)
             X_train = mcca.transform(X_train)
             mcca.mcca_space()
+
             if self.random_train:
                 size_test = X_array[leave_out_sub].shape
                 X_test = np.random.rand(size_test[0], size_test[1] * 1000)
             else:
                 X_test = X_array[leave_out_sub]
+
             if self.nested_cv:
-                kfold = KFold(4, shuffle=False)
+                kfold = StratifiedShuffleSplit(4,random_state=0)
                 X_test_all, y_test_all = [], []
-                for train_idx, test_idx in kfold.split(X_test):
+                for train_idx, test_idx in kfold.split(X_test,y_test):
                     X_test_train, X_test_test = X_test[train_idx, :], X_test[test_idx, :]
                     y_test_train, y_test_test = y_test[train_idx], y_test[test_idx]
-                    n_cc = CONFIG["MCCA"]["n_components_mcca"]
-                    X_test_train = PCA_60(X_test_train, n_cc)
-                    X_test_test = PCA_60(X_test_test, n_cc)
+
+                    # X_test_train = X_test_train - np.mean(X_test_train, axis=0)
+
+
+                    X_test_test = X_test_test - np.mean(X_test_train, axis=0)
+                    # X_test_test = X_test_test - np.mean(X_test_test, axis=0)
+                    X_test_train = X_test_train - np.mean(X_test_train, axis=0)
+                    X_test_train, pca= PCA_60(X_test_train, n_cc, 1)
+                    X_test_test = pca.transform(X_test_test)
+                    # X_test_test = PCA_60(X_test_test, n_cc)
+
+                    #X_test_train = pca.demean(X_test_train)
+                    #X_test_test = pca.demean(X_test_test)
+                    #X_test_test = X_test_test - np.mean(())
+                    #pca.fit(X_test_train)
+                    #X_test_train = pca.transform(X_test_train)
+                    #X_test_test = pca.transform(X_test_test)
+
+
+
                     mcca.fit_new_data(X_test_train, train_idx=train_idx)
                     X_test_test = mcca.transform_new_data(X_test_test)
                     X_test_all.append(X_test_test)
@@ -195,6 +221,7 @@ class CV_Tool:
                 return X_train, np.concatenate(X_test_all), y_train, np.concatenate(y_test_all)
 
             else:
+                X_test = PCA_60(X_test, n_cc)
                 mcca.fit_new_data(X_test)
                 X_test = mcca.transform_new_data(X_test)
 

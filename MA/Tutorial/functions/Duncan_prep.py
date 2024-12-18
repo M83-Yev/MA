@@ -211,7 +211,7 @@ class Duncan_Prep:
         # gm_fmri_data = masking.apply_mask(data_prep_Nifti, binary_gm_mask)
         # vt_fmri_data = masking.apply_mask(data_prep_Nifti, HO_vt_mask_resampled)
 
-        return self.gmvt_fmri_data
+        return gmvt_mask, self.gmvt_fmri_data
 
     def prepare_data(self):
         ############ Step 4 ##############

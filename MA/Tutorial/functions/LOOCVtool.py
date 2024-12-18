@@ -5,8 +5,8 @@ import time
 import random
 from itertools import combinations
 from sklearn.multiclass import OneVsRestClassifier
-from MA.Tutorial.functions.Hypertool import HyperAlign, procrustes
-from MA.Tutorial.functions.MCCAtool import MCCA
+from .Hypertool import HyperAlign, procrustes
+from .MCCAtool import MCCA
 
 
 # def LOOCVtool(X_array, Y_array, method=None, n_mcca_components=675):

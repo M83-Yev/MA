@@ -1,8 +1,8 @@
 MCCA:
-  n_components_mcca: 10
+  n_components_mcca: 60
   r: 0
 PCA:
-  n_pcs: 100
+  n_pcs: 120
 
 Prep:
-  main_path: 'G:\\Data\\word_obj'
+  main_path: '/data2/xwu/word_obj/'

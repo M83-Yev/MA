@@ -55,15 +55,15 @@ def load_Haxby(data_dir, sub_range=range(1, 7), fetch_data=False, individual_mas
 
         else:
             # dataset directory
-            anat_dir = os.path.join(data_dir, f'haxby2001\\subj{sub}\\anat.nii.gz')
-            func_dir = os.path.join(data_dir, f'haxby2001\\subj{sub}\\bold.nii.gz')
+            anat_dir = os.path.join(data_dir, f'haxby2001/subj{sub}/anat.nii.gz')
+            func_dir = os.path.join(data_dir, f'haxby2001/subj{sub}/bold.nii.gz')
             if individual_mask:
                 maskvt_dir = os.path.join(data_dir,
-                                          f'haxby2001\\subj{sub}\\mask4_vt.nii.gz')
+                                          f'haxby2001/subj{sub}/mask4_vt.nii.gz')
             else:
                 # TODO: dynamically find and define the largest size of voxel
                 maskvt_dir = os.path.join(data_dir,
-                                          f'haxby2001\\subj{4}\\mask4_vt.nii.gz')  # Sub 4, bc largest voxel number
+                                          f'haxby2001/subj{4}/mask4_vt.nii.gz')  # Sub 4, bc largest voxel number
 
         print(f"sub: {sub}, anat_dir: {anat_dir}, func_dir: {func_dir}, maskvt_dir: {maskvt_dir}")
 
