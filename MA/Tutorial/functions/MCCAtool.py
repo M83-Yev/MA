@@ -6,9 +6,7 @@ from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import LeaveOneOut
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-
-
-from MA.Tutorial.functions.config import CONFIG
+from .config import CONFIG
 
 
 class MCCA(TransformerMixin):
@@ -43,7 +41,6 @@ class MCCA(TransformerMixin):
             self.n_ccs = self.n_pcs_list[0]
         p, h_all = eigh(R_kl, R_kk, subset_by_index=(self.size - self.n_ccs, self.size - 1))
 
-
         # # h = np.flip(h, axis=1).reshape((n_subjects, n_pcs, self.n_ccs))
         # h, self.mcca_weights = [], []
         # idx_start = 0
@@ -55,7 +52,6 @@ class MCCA(TransformerMixin):
         #     self.mcca_weights.append(h[sub] / norm(h[sub], ord=2, keepdims=True))
         #     # self.mcca_weights.append(h[sub] / norm(X[sub] @ h[sub], ord=2, keepdims=True))
 
-
         h_all = np.flip(h_all, axis=1)
         # Reshape h from (subjects * PCs, CCs) to (subjects, PCs, CCs)
         h = h_all.reshape((len(self.n_pcs_list), self.n_pcs_list[0], self.n_ccs))
@@ -64,6 +60,7 @@ class MCCA(TransformerMixin):
         # self.mcca_weights = h / norm(h, ord=2, axis=(1, 2), keepdims=True)
 
         return self
+
     # def fit(self, X):
     #
     #     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -111,11 +108,15 @@ class MCCA(TransformerMixin):
         self.X_mcca_avg = np.mean(self.X_mcca_transformed, axis=0)
         return self.X_mcca_avg
 
-    def fit_new_data(self, X_new):
+    def fit_new_data(self, X_new, train_idx = None):
         if self.X_mcca_avg is None:
             raise NotFittedError('MCCA average needs to be computed before calling fit_new_data')
         # print(f"X_new {X_new.shape}, self.X_mcca_avg {self.X_mcca_avg.shape}")
-        self.new_mcca_weights = np.dot(np.linalg.pinv(X_new), self.X_mcca_avg)
+        if train_idx is not None:
+            self.new_mcca_weights = np.dot(np.linalg.pinv(X_new), self.X_mcca_avg[train_idx])
+        else:
+            self.new_mcca_weights = np.dot(np.linalg.pinv(X_new), self.X_mcca_avg)
+
         return self
 
     def transform_new_data(self, X_new):
@@ -230,7 +231,8 @@ def whiten(data):
 
     return whitened_data
 
-def PCA_60(data):
+
+def PCA_60(data, n_pcs, return_pca = None):
     # Center the data
     data_centered = data - np.mean(data, axis=0)
 
@@ -238,8 +240,54 @@ def PCA_60(data):
     # std_dev = np.nanstd(data_centered, axis=0)
     # std_dev[std_dev == 0] = 1e-10
     # Apply PCA
-    n_pcs = CONFIG["PCA"]["n_pcs"]
+    # n_pcs = CONFIG["PCA"]["n_pcs"]
     pca = PCA(n_components=n_pcs, whiten=True)
     whitened_data = pca.fit_transform(data_centered)
+    #whitened_data = pca.fit_transform(data)
+    if return_pca is not None:
+        return whitened_data, pca
+    else:
+        return whitened_data
 
-    return whitened_data
+class PCA_MA:
+    def __init__(self, _whiten=False, n_components=None):
+        self.Vt = None
+        self.S = None
+        self.U = None
+        self.components_ = None
+        self.whiten = _whiten
+        self.n_components = n_components
+
+    def demean(self, X):
+        X_demean = X - np.mean(X, axis=0)
+        return X_demean
+
+    def fit(self, X_demean):
+        self.U, self.S, self.Vt = np.linalg.svd(X_demean, full_matrices=False)
+        return self
+
+    def transform(self, X_demean):
+        if self.n_components is not None:
+            self.Vt = self.Vt[: self.n_components]
+            self.S = self.S[: self.n_components]
+
+        self.components_ = self.Vt
+
+#        if not self.whiten:
+#            self.U *= self.S
+#        else:
+#            self.U *= np.sqrt(X_demean.shape[0] - 1)
+#
+#       return self.U
+        X_proj = np.dot(X_demean, self.Vt.T)
+        if not self.whiten:
+            return X_proj
+        else:
+            X_whitened = X_proj / self.S
+            X_whitened *= np.sqrt(X_demean.shape[0]-1)
+            return X_whitened
+
+    def fit_transform(self, X):
+        X_demean = self.demean(X)
+        self.fit(X_demean)
+        return self.transform(X_demean)
